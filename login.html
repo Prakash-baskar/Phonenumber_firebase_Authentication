@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase OTP Login</title>
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js';
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js';
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA2nYqDOQ9YOLB6kVsqu0TKEKnE12tDcSM",
+            authDomain: "eb-finance.firebaseapp.com",
+            projectId: "eb-finance",
+            storageBucket: "eb-finance.appspot.com",
+            messagingSenderId: "565809855212",
+            appId: "1:565809855212:web:ceea406bfe040a499083c9"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Function to send OTP
+        window.sendOTP = function () {
+            const phoneNumber = document.getElementById("mobile").value;
+
+            // Ensure phone number is in E.164 format
+            if (!phoneNumber.startsWith('+')) {
+                alert("Please enter phone number in E.164 format (e.g., +1234567890)");
+                return;
+            }
+
+            const appVerifier = new RecaptchaVerifier('recaptcha-container', { size: 'invisible' }, auth);
+
+            signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+                .then((confirmationResult) => {
+                    window.confirmationResult = confirmationResult; // Store confirmation result globally
+                    alert("OTP sent successfully!");
+                })
+                .catch((error) => {
+                    console.error("Error during OTP sending:", error);
+                    alert("Failed to send OTP: " + error.message);
+                });
+        };
+
+        // Function to verify OTP and login
+        window.verifyOTP = function () {
+            const code = document.getElementById("otp").value;
+
+            if (!code) {
+                alert("Please enter the OTP!");
+                return;
+            }
+
+            window.confirmationResult.confirm(code)
+                .then((result) => {
+                    const user = result.user;
+
+                    // Get ID token to authenticate with the backend
+                    user.getIdToken().then((idToken) => {
+                        const userData = {
+                            phoneNumber: user.phoneNumber, // Phone number retrieved from Firebase
+                            firebaseId: user.uid // Firebase UID
+                        };
+
+                        // Send data to the backend
+                        fetch('http://localhost:8081/api/user/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + idToken // Send the ID token
+                            },
+                            body: JSON.stringify(userData), // Send phone number and Firebase UID
+                        })
+                            .then((response) => {
+                                if (response.ok) {
+                                    return response.json();
+                                } else {
+                                    throw new Error('Failed to log in: ' + response.statusText);
+                                }
+                            })
+                            .then((data) => {
+                                alert("Login successful!");
+                                console.log("User logged in:", data);
+                            })
+                            .catch((error) => {
+                                console.error("Error during login:", error);
+                                alert("Login failed: " + error.message);
+                            });
+                    }).catch((error) => {
+                        console.error("Error retrieving ID token:", error);
+                        alert("Failed to retrieve ID token: " + error.message);
+                    });
+                })
+                .catch((error) => {
+                    console.error("Error during verification:", error);
+                    alert("Verification failed: " + error.message);
+                });
+        };
+    </script>
+</head>
+<body>
+    <div>
+        <h3>Login with Phone Number and OTP</h3>
+        <label for="mobile">Enter mobile number:</label>
+        <input id="mobile" placeholder="e.g., +1234567890" type="text" /><br>
+        <button onclick="sendOTP()">Send OTP</button>
+
+        <div>
+            <label for="otp">Enter OTP:</label>
+            <input id="otp" type="text" placeholder="Enter OTP received" />
+            <button onclick="verifyOTP()">Verify OTP</button>
+        </div>
+
+        <!-- Invisible reCAPTCHA container -->
+        <div id="recaptcha-container"></div>
+    </div>
+</body>
+</html>

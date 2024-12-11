@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Phone Authentication</title>
+    <!-- Use type="module" for ES module support -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js';
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js';
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA2nYqDOQ9YOLB6kVsqu0TKEKnE12tDcSM",
+            authDomain: "eb-finance.firebaseapp.com",
+            projectId: "eb-finance",
+            storageBucket: "eb-finance.firebasestorage.app",
+            messagingSenderId: "565809855212",
+            appId: "1:565809855212:web:ceea406bfe040a499083c9"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        window.sendOTP = function() {
+            const phoneNumber = document.getElementById("mobile").value;
+            const appVerifier = new RecaptchaVerifier('recaptcha-container', {}, auth);
+
+            signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+                .then((confirmationResult) => {
+                    window.confirmationResult = confirmationResult;
+                    alert("OTP sent successfully!");
+                }).catch((error) => {
+                    console.error("Error during OTP sending:", error);
+                    alert("Failed to send OTP: " + error.message);
+                });
+        };
+
+        window.verifyOTP = function() {
+            const code = document.getElementById("otp").value;
+            window.confirmationResult.confirm(code).then((result) => {
+                const user = result.user;
+
+                // Send user data to backend
+                const userData = {
+                    name: document.getElementById("name").value,
+                    email: document.getElementById("email").value,
+                    phoneNumber: document.getElementById("mobile").value,
+                    firebaseId: user.uid,
+                    userName: document.getElementById("mobile").value
+                };
+
+                // Make an API request to store the data in the backend
+                fetch('http://localhost:8081/api/user/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + user.stsTokenManager.accessToken // Firebase token for validation
+                    },
+                    body: JSON.stringify(userData),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert("User registered successfully!");
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("Failed to register user");
+                });
+            }).catch((error) => {
+                console.error("Error during verification:", error);
+                alert("Verification failed: " + error.message);
+            });
+        };
+    </script>
+</head>
+<body>
+    <div>
+        <h3>Firebase Phone Authentication</h3>
+        <label for="name">Enter name:</label>
+        <input id="name" placeholder="Enter your name" type="text" /><br>
+
+        <label for="email">Enter email:</label>
+        <input id="email" placeholder="Enter your email" type="email" /><br>
+
+        <label for="mobile">Enter mobile number:</label>
+        <input id="mobile" placeholder="e.g., +1234567890" type="text" /><br>
+        <button onclick="sendOTP()">Send OTP</button>
+
+        <div>
+            <label for="otp">Enter OTP:</label>
+            <input id="otp" type="text" placeholder="Enter OTP received" />
+            <button onclick="verifyOTP()">Verify OTP</button>
+        </div>
+        <div>
+            <label for="login">Already an user?</label>
+          
+            <a href="login.html">Login</a>
+        </div>
+
+        <!-- reCAPTCHA container -->
+        <div id="recaptcha-container"></div>
+    </div>
+
+</body>
+</html>
